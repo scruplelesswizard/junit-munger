@@ -17,8 +17,13 @@ import (
 
 func main() {
 
-	inPath := flag.String("in", "", "display colorized output")
+	inPath := flag.String("in", "", "glob of JUnit XML files to merge, e.g. 'results/rspec-*.xml' (supports **)")
 	flag.Parse()
+
+	if *inPath == "" {
+		flag.Usage()
+		os.Exit(2)
+	}
 
 	suites := getSuitesFromJUnitXML(*inPath)
 
@@ -26,7 +31,10 @@ func main() {
 
 	report := buildReportOutput(junitSuites)
 
-	out, _ := xml.MarshalIndent(report, " ", "  ")
+	out, err := xml.MarshalIndent(report, " ", "  ")
+	if err != nil {
+		log.Fatalf("failed to marshal report: %v\n", err)
+	}
 	fmt.Println(string(out))
 
 }
