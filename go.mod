@@ -1,4 +1,4 @@
-module github.com/chaosaffe/junit-munger
+module github.com/scruplelesswizard/junit-munger
 
 go 1.19
 

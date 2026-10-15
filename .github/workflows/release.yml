@@ -1,0 +1,78 @@
+name: Release
+
+# Cuts a new release on every push to main that changes code or CI.
+# Version bump is a patch by default. Put "[minor]" or "[major]" in the
+# head commit message (for a squash merge, the PR title) to bump higher.
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - ".github/dependabot.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test -race -count=1 ./...
+
+      - name: Compute next version
+        id: version
+        run: |
+          set -euo pipefail
+          LATEST=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | grep -v -- '-' | sort -V | tail -n1 || true)
+          if [ -z "$LATEST" ]; then
+            NEXT="v1.0.0"
+          else
+            IFS=. read -r MAJOR MINOR PATCH <<< "${LATEST#v}"
+            MSG=$(git log -1 --pretty=%B)
+            if [[ "$MSG" == *"[major]"* ]]; then
+              NEXT="v$((MAJOR + 1)).0.0"
+            elif [[ "$MSG" == *"[minor]"* ]]; then
+              NEXT="v${MAJOR}.$((MINOR + 1)).0"
+            else
+              NEXT="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+            fi
+          fi
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+
+      - name: Build binaries
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          mkdir dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            GOOS=${target%/*} GOARCH=${target#*/} \
+              go build -trimpath -ldflags "-s -w" -o "dist/junit-munger_${VERSION}_${target%/*}_${target#*/}" .
+          done
+          (cd dist && sha256sum * > checksums.txt)
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$VERSION" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --generate-notes
