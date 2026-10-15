@@ -55,6 +55,9 @@ func buildReportOutput(in []junit.Suite) (out report.Testsuites) {
 		if err != nil {
 			log.Fatalf("could not parse duration: %s\n", err)
 		}
+		if a == b {
+			return out.Suites[i].Name < out.Suites[j].Name
+		}
 		return a > b
 	})
 

@@ -16,7 +16,8 @@ output as its `junit-path` to balance parallel CI runners by real durations.
 go install github.com/scruplelesswizard/junit-munger@latest
 ```
 
-or build from source:
+or download a binary for Linux or macOS from the
+[releases page](https://github.com/scruplelesswizard/junit-munger/releases), or build from source:
 
 ```bash
 go build -o junit-munger .
